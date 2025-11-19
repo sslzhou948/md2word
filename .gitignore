@@ -1,7 +1,40 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ------------------------------------------------------------------------------
+# md2word .gitignore
+# ------------------------------------------------------------------------------
+# 依專案實際需求整理，避免把可再生或大型工具檔案提交到 GitHub
+# ------------------------------------------------------------------------------
 
-# dependencies
-/node_modules
+### Node / Next.js 相關 ###
+node_modules/
+.next/
+out/
+dist/
+build/
+.vercel/
+*.tsbuildinfo
+
+### 工具與二進位 ###
+/tools/node/
+/tools/pandoc/
+/logs/
+logs/**
+*.log
+
+### 作業系統產物 ###
+.DS_Store
+Thumbs.db
+
+### 包管理器 ###
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+### 環境變數與密鑰 ###
+.env*
+!.env.local.example
+
+### 其他 ###
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,33 +42,3 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
