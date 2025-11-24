@@ -1,0 +1,27 @@
+<svg width="400" height="300" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="400" height="300" fill="#F5F5F5"/>
+  
+  <!-- 文档主体 -->
+  <rect x="40" y="40" width="320" height="220" rx="4" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="2"/>
+  
+  <!-- 标题区域 -->
+  <rect x="60" y="60" width="280" height="24" rx="2" fill="#000000"/>
+  <rect x="60" y="100" width="200" height="16" rx="2" fill="#D0D0D0"/>
+  
+  <!-- 正文段落 -->
+  <rect x="60" y="140" width="280" height="8" rx="2" fill="#E0E0E0"/>
+  <rect x="60" y="156" width="240" height="8" rx="2" fill="#E0E0E0"/>
+  <rect x="60" y="172" width="260" height="8" rx="2" fill="#E0E0E0"/>
+  
+  <!-- 列表项 -->
+  <circle cx="80" cy="200" r="4" fill="#000000"/>
+  <rect x="96" y="196" width="120" height="8" rx="2" fill="#E0E0E0"/>
+  
+  <circle cx="80" cy="220" r="4" fill="#000000"/>
+  <rect x="96" y="216" width="100" height="8" rx="2" fill="#E0E0E0"/>
+  
+  <!-- 标签 -->
+  <text x="200" y="280" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">通用样式</text>
+</svg>
+

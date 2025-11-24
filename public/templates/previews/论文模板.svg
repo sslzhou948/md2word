@@ -1,0 +1,32 @@
+<svg width="400" height="300" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景 -->
+  <rect width="400" height="300" fill="#F5F5F5"/>
+  
+  <!-- 文档主体 -->
+  <rect x="40" y="40" width="320" height="220" rx="4" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="2"/>
+  
+  <!-- 封面标题 -->
+  <rect x="100" y="60" width="200" height="24" rx="2" fill="#000000"/>
+  
+  <!-- 作者信息 -->
+  <rect x="100" y="100" width="80" height="12" rx="2" fill="#D0D0D0"/>
+  <rect x="220" y="100" width="80" height="12" rx="2" fill="#D0D0D0"/>
+  
+  <!-- 摘要标题 -->
+  <rect x="60" y="140" width="60" height="14" rx="2" fill="#000000"/>
+  <rect x="60" y="162" width="280" height="8" rx="2" fill="#E0E0E0"/>
+  <rect x="60" y="178" width="260" height="8" rx="2" fill="#E0E0E0"/>
+  
+  <!-- 关键词 -->
+  <rect x="60" y="200" width="50" height="12" rx="2" fill="#D0D0D0"/>
+  <rect x="120" y="200" width="40" height="12" rx="2" fill="#E0E0E0"/>
+  <rect x="170" y="200" width="40" height="12" rx="2" fill="#E0E0E0"/>
+  
+  <!-- 章节标题 -->
+  <rect x="60" y="230" width="80" height="14" rx="2" fill="#000000"/>
+  <rect x="60" y="250" width="280" height="8" rx="2" fill="#E0E0E0"/>
+  
+  <!-- 标签 -->
+  <text x="200" y="280" font-family="Arial, sans-serif" font-size="14" fill="#666666" text-anchor="middle">论文模板</text>
+</svg>
+
