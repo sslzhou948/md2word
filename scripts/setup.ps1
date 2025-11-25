@@ -1,3 +1,8 @@
+# 设置控制台编码为 UTF-8，确保中文字符正确显示
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+
 Param(
   [string]$NodeVersion = 'v20.17.0',
   [string]$NodeArchive = 'node-v20.17.0-win-x64.zip',

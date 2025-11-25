@@ -1,29 +1,29 @@
 ## md2word · Markdown → Word
 
-This project uses Next.js 14 (App Router) + Pandoc + LLM to clean Markdown and export docx with custom templates. It runs on Windows or Linux servers and ships portable tooling plus automation scripts for one-command setup.
+本项目使用 Next.js 14 (App Router) + AI Markdown 格式化/转换引擎 + LLM 来清洗 Markdown 并导出带自定义模板的 docx 文档。可在 Windows 或 Linux 服务器上运行，内置便携式工具链和自动化脚本，支持一键初始化。
 
-### Key Features
-- LLM cleans Markdown while preserving headings/lists and avoiding hallucinations.
-- Pandoc applies Word templates stored in `templates/`.
-- Frontend form uploads Markdown, selects template, downloads docx, and can ping LLM health.
-- API returns structured error codes + failure steps (`CONV_*`) to speed up debugging.
+### 核心功能
+- LLM 清洗 Markdown，保留标题/列表结构，避免幻觉
+- docx 转换 CLI 应用 Word 模板（存储在 `templates/` 目录）
+- 前端表单支持上传 Markdown、选择模板、下载 docx，并可检测 LLM 健康状态
+- API 返回结构化错误码 + 失败步骤（`CONV_*`），便于快速调试
 
-### Tech Stack
-- Next.js 14 App Router (Node.js runtime API routes)
-- `fetch` to OpenAI-compatible Chat Completions API
-- Pandoc 3.5 portable (override via `PANDOC_PATH` if desired)
-- Code organized under `config/`, `lib/`, `components/`, `api/`
+### 技术栈
+- Next.js 14 App Router（Node.js 运行时 API 路由）
+- `fetch` 调用 OpenAI 兼容的 Chat Completions API
+- docx 转换 CLI 3.5 便携版（可通过 `PANDOC_PATH` 自定义路径）
+- 代码组织：`config/`、`lib/`、`components/`、`api/`
 
-### Environment Variables
-| Name | Description |
+### 环境变量
+| 名称 | 说明 |
 | --- | --- |
-| `LLM_API_KEY` | API key for LLM provider |
-| `LLM_API_BASE_URL` | e.g. `https://api.openai.com/v1` |
-| `LLM_MODEL` | e.g. `gpt-4.1-mini` |
-| `PANDOC_PATH` | *(optional)* custom path to pandoc executable |
-| `PORTABLE_NODE_PATH` | *(optional)* custom path to portable Node |
+| `LLM_API_KEY` | LLM 服务商的 API 密钥 |
+| `LLM_API_BASE_URL` | 例如 `https://api.openai.com/v1` |
+| `LLM_MODEL` | 例如 `gpt-4.1-mini` |
+| `PANDOC_PATH` | *(可选)* docx 转换 CLI 可执行文件的自定义路径 |
+| `PORTABLE_NODE_PATH` | *(可选)* 便携式 Node 的自定义路径 |
 
-> Copy `.env.local.example` to `.env.local` (or `.env`), then fill the values:
+> 将 `.env.local.example` 复制为 `.env.local`（或 `.env`），然后填写相应值：
 > ```bash
 > # Windows PowerShell
 > Copy-Item .env.local.example .env.local
@@ -31,77 +31,89 @@ This project uses Next.js 14 (App Router) + Pandoc + LLM to clean Markdown and e
 > cp .env.local.example .env.local
 > ```
 
-### Local Development
+### 本地开发
 ```bash
 npm install
 npm run dev
 # http://localhost:3000
 ```
-> Portable Node lives under `tools/node/`. Delete it if you prefer system Node.
+> 便携式 Node 位于 `tools/node/` 目录。如果更偏好使用系统 Node，可删除该目录。
 
-### From GitHub to Deployment
-1. **Clone**
+### 从 GitHub 到部署
+1. **克隆仓库**
    ```bash
    git clone https://github.com/sslzhou948/md2word.git
    cd md2word
    ```
-2. **Environment variables**
+2. **配置环境变量**
    ```bash
    Copy-Item .env.local.example .env.local   # Windows
    cp .env.local.example .env.local         # macOS / Linux
    ```
-3. **Initialize dependencies**
+3. **初始化依赖**
    ```powershell
-   # Windows
+   # Windows（推荐使用批处理文件，自动处理编码问题）
+   .\scripts\setup.bat
+   # 或者直接使用 PowerShell（如果遇到编码错误，请先执行 chcp 65001）
    powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
    # Linux / macOS
    chmod +x scripts/setup-linux.sh
    ./scripts/setup-linux.sh
    ```
-   These scripts download portable Node.js / Pandoc (if needed) and run `npm install`.
-4. **Run**
+   这些脚本会下载便携式 Node.js / docx 转换 CLI（如需要），并运行 `npm install`。
+   
+   > **Windows 编码问题**: 如果遇到 "字符串缺少终止符" 或中文乱码错误，请使用 `.\scripts\setup.bat` 执行，或先运行 `chcp 65001` 设置代码页为 UTF-8。
+4. **运行**
    ```bash
-   npm run dev                    # development
-   npm run build && npm run start # production
+   npm run dev                    # 开发模式
+   npm run build && npm run start # 生产模式
    ```
 
-### nginx Reverse Proxy Essentials
+### Nginx 反向代理要点
 - `proxy_read_timeout 300s` / `proxy_send_timeout 300s` / `proxy_connect_timeout 300s`
-- `send_timeout 300s` to keep the downstream connection alive while Pandoc/LLM work
+- `send_timeout 300s` 以在 docx 转换 CLI/LLM 处理期间保持下游连接活跃
 - `client_max_body_size 10M`
-- `proxy_buffering on`, `proxy_buffer_size 4k`, `proxy_buffers 8 4k`
-- Full sample: `nginx.conf.example`
+- `proxy_buffering on`、`proxy_buffer_size 4k`、`proxy_buffers 8 4k`
+- 完整示例：`nginx.conf.example`
 
-### API Flow
-1. `POST /api/convert` receives `markdown`, `templateId`
-2. `cleanMarkdownWithLlm` normalizes Markdown through LLM
-3. `convertMarkdownToDocx` uses Pandoc + template to output docx
-4. Response returns docx (base64) + cleaned Markdown preview
+### API 流程
+1. `POST /api/convert` 接收 `markdown`、`templateId`
+2. `cleanMarkdownWithLlm` 通过 LLM 规范化 Markdown
+3. `convertMarkdownToDocx` 使用 docx 转换 CLI + 模板输出 docx
+4. 响应返回 docx（base64）+ 清洗后的 Markdown 预览
 
-### Health Check & Error Codes
-- `GET /api/llm-health` performs a lightweight LLM ping.
-- Convert API emits error codes (`CONV_01_01`, `CONV_03_99`, `CONV_99_TIMEOUT`, …).
-- Frontend shows code + failure step + hints (e.g. nginx timeout, pandoc missing).
+### 健康检查与错误码
+- `GET /api/llm-health` 执行轻量级 LLM 连通性检测
+- 转换 API 发出错误码（`CONV_01_01`、`CONV_03_99`、`CONV_99_TIMEOUT` 等）
+- 前端显示错误码 + 失败步骤 + 提示（例如 nginx 超时、docx 转换 CLI 缺失）
 
-### Common Issues
-| Problem | Cause | Fix |
+### 常见问题
+| 问题 | 原因 | 解决方法 |
 | --- | --- | --- |
-| `npm` not found | Node missing / portable Node not used | Run setup script or install Node 20+ |
-| `PSSecurityException` | PowerShell blocked | `Set-ExecutionPolicy -Scope Process Bypass` |
-| `pandoc: command not found` | Binary missing | Keep `tools/pandoc/` or set `PANDOC_PATH` |
-| `CONV_99_TIMEOUT` | nginx timeout too short | Increase `proxy_read_timeout` (≥300s) |
-| 429/5xx from LLM | Rate limit / upstream failure | Retry later, use LLM health check |
+| `npm` 未找到 | Node 缺失 / 未使用便携式 Node | 运行初始化脚本或安装 Node 20+ |
+| `PSSecurityException` | PowerShell 被阻止 | `Set-ExecutionPolicy -Scope Process Bypass` |
+| `pandoc: command not found` | 二进制文件缺失 | 保留 `tools/pandoc/` 或设置 `PANDOC_PATH` |
+| `CONV_99_TIMEOUT` | nginx 超时时间过短 | 增加 `proxy_read_timeout`（≥300s） |
+| LLM 返回 429/5xx | 速率限制 / 上游故障 | 稍后重试，使用 LLM 健康检查 |
 
-### File Structure Notes
-- Templates: add docx under `templates/` and declare in `src/config/templates.ts`
-- Prompt config at `src/config/llmPrompt.ts`
-- Portable toolchain lives under `tools/` (ignored by Git)
-- Logs output to `logs/` (ignored by Git)
+### 文件结构说明
+- 模板：在 `templates/` 目录下添加 docx 文件，并在 `src/config/templates.ts` 中声明
+- 提示词配置位于 `src/config/llmPrompt.ts`
+- 便携式工具链位于 `tools/` 目录（Git 忽略）
+- 日志输出到 `logs/` 目录（Git 忽略）
 
-### Roadmap Ideas
-- Template management UI
-- Batch / queue processing
-- Extract formatting logic as reusable package (Electron/Tauri)
+### 模板维护说明
+- 仅支持官方模板，模板文件需放置在 `templates/` 目录
+- 在 `src/config/templates.ts` 中配置模板信息（ID、名称、描述、文件名、预览图等）
+- 预览图需放置在 `public/templates/previews/` 目录
+- 详细说明请参考代码注释
+
+### 路线图
+- 模板管理 UI
+- 批量 / 队列处理
+- 将格式化逻辑提取为可复用包（Electron/Tauri）
 
 ---
-If something breaks, double-check `.env.local`, nginx proxy settings, or the error codes surfaced in the UI. Issues & PRs welcome!
+如果出现问题，请检查 `.env.local`、nginx 代理设置或 UI 中显示的错误码。欢迎提交 Issue 和 PR！
+
+[English](README.en.md) | [中文](README.md)
