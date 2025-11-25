@@ -104,4 +104,3 @@ npm run dev
 - Extract formatting logic as reusable package (Electron/Tauri)
 
 ---
-If something breaks, double-check `.env.local`, nginx proxy settings, or the error codes surfaced in the UI. Issues & PRs welcome!

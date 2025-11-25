@@ -1,14 +1,14 @@
-# Set console encoding to UTF-8
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
-chcp 65001 | Out-Null
-
-Param(
+﻿Param(
   [string]$NodeVersion = 'v20.17.0',
   [string]$NodeArchive = 'node-v20.17.0-win-x64.zip',
   [string]$PandocVersion = '3.5',
   [string]$PandocArchive = 'pandoc-3.5-windows-x86_64.zip'
 )
+
+# Set console encoding to UTF-8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
 
 $ErrorActionPreference = 'Stop'
 
