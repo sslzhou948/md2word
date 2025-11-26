@@ -24,74 +24,40 @@ function Get-DownloadUrls {
   param([string]$PrimaryUrl)
 
   $urls = New-Object System.Collections.Generic.List[string]
-
   $normalizedPrimary = $PrimaryUrl.Trim()
 
-  try {
-    $uri = [Uri]$normalizedPrimary
-    $host = $uri.Host.ToLowerInvariant()
-    $path = $uri.AbsolutePath
-
-    if ($env:MD2WORD_GITHUB_MIRROR -and $host -eq 'github.com') {
-      $mirrorBase = $env:MD2WORD_GITHUB_MIRROR.TrimEnd('/')
-      $mirrorUrl = "$mirrorBase$path"
-      if ($uri.Query) {
-        $mirrorUrl += $uri.Query
-      }
-      $urls.Add($mirrorUrl)
-    }
-
-    if ($host -eq 'github.com') {
-      # 1) Prefer ghproxy.net which you verified works
-      $urls.Add("https://ghproxy.net/$normalizedPrimary")
-
-      # 2) Then try the original GitHub URL
-      $urls.Add($normalizedPrimary)
-
-      # 3) Then GitHub release mirrors
-      if ($path -match '^/(?<owner>[^/]+)/(?<repo>[^/]+)/releases/download/(?<tag>[^/]+)/(?<asset>.+)$') {
-        $owner = $Matches.owner
-        $repo = $Matches.repo
-        $tag = $Matches.tag
-        $asset = $Matches.asset
-        $urls.Add("https://download.fastgit.org/$owner/$repo/releases/download/$tag/$asset")
-        $urls.Add("https://mirrors.aliyun.com/github-release/$owner/$repo/$tag/$asset")
-      } else {
-        $ghPath = $path.TrimStart('/')
-        if ($uri.Query) {
-          $ghPath += $uri.Query
-        }
-        $urls.Add("https://download.fastgit.org/$ghPath")
-      }
-
-      # 4) Finally fall back to ghproxy.com
-      $urls.Add("https://ghproxy.com/$normalizedPrimary")
-    } elseif ($host -eq 'nodejs.org' -and $path -match '^/dist/(?<version>[^/]+)/(?<asset>.+)$') {
+  # Strategy A: Node.js downloads (use domestic mirrors, do NOT send through GitHub proxies)
+  if ($normalizedPrimary -match 'nodejs.org') {
+    if ($normalizedPrimary -match 'dist/(?<version>v[\d\.]+)/(?<asset>.+)') {
       $version = $Matches.version
       $asset = $Matches.asset
 
-      # For Node.js: keep the original fast path (official first, then domestic mirrors, then proxies)
-      # 1) Original official Node.js URL
-      $urls.Add($normalizedPrimary)
-
-      # 2) Domestic mirrors
-      $urls.Add("https://mirrors.aliyun.com/nodejs-release/$version/$asset")
+      # Priority 1: npmmirror (Taobao mirror)
       $urls.Add("https://npmmirror.com/mirrors/node/$version/$asset")
 
-      # 3) Proxies as a fallback
-      $urls.Add("https://ghproxy.net/$normalizedPrimary")
-      $urls.Add("https://ghproxy.com/$normalizedPrimary")
-    } else {
-      # Generic case: proxy first, then original
-      $urls.Add("https://ghproxy.net/$normalizedPrimary")
-      $urls.Add("https://ghproxy.com/$normalizedPrimary")
-      $urls.Add($normalizedPrimary)
+      # Priority 2: Aliyun mirror
+      $urls.Add("https://mirrors.aliyun.com/nodejs-release/$version/$asset")
     }
-  } catch {
-    $urls.Add("https://ghproxy.net/$normalizedPrimary")
-    $urls.Add("https://ghproxy.com/$normalizedPrimary")
+
+    # Always add original URL as a fallback
     $urls.Add($normalizedPrimary)
+    return $urls | Select-Object -Unique
   }
+
+  # Strategy B: GitHub downloads (use GitHub-specific proxies)
+  if ($normalizedPrimary -match 'github.com') {
+    # Proxy 1: ghproxy.net (relatively stable, see https://ghproxy.net/)
+    $urls.Add("https://ghproxy.net/$normalizedPrimary")
+
+    # Proxy 2: mirror.ghproxy.com
+    $urls.Add("https://mirror.ghproxy.com/$normalizedPrimary")
+
+    # Proxy 3: kgithub.com mirror
+    $urls.Add($normalizedPrimary.Replace("github.com", "kgithub.com"))
+  }
+
+  # Always include the original URL as the final fallback
+  $urls.Add($normalizedPrimary)
 
   return $urls | Select-Object -Unique
 }
