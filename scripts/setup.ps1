@@ -17,9 +17,66 @@ function Write-Step {
   Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+function Get-DownloadUrls {
+  param([string]$PrimaryUrl)
+
+  $urls = New-Object System.Collections.Generic.List[string]
+
+  $normalizedPrimary = $PrimaryUrl.Trim()
+  if (-not [string]::IsNullOrWhiteSpace($normalizedPrimary)) {
+    $urls.Add($normalizedPrimary)
+  }
+
+  try {
+    $uri = [Uri]$normalizedPrimary
+    $host = $uri.Host.ToLowerInvariant()
+    $path = $uri.AbsolutePath
+
+    if ($env:MD2WORD_GITHUB_MIRROR -and $host -eq 'github.com') {
+      $mirrorBase = $env:MD2WORD_GITHUB_MIRROR.TrimEnd('/')
+      $mirrorUrl = "$mirrorBase$path"
+      if ($uri.Query) {
+        $mirrorUrl += $uri.Query
+      }
+      $urls.Insert(0, $mirrorUrl)
+    }
+
+    if ($host -eq 'github.com') {
+      if ($path -match '^/(?<owner>[^/]+)/(?<repo>[^/]+)/releases/download/(?<tag>[^/]+)/(?<asset>.+)$') {
+        $owner = $Matches.owner
+        $repo = $Matches.repo
+        $tag = $Matches.tag
+        $asset = $Matches.asset
+        $urls.Add("https://download.fastgit.org/$owner/$repo/releases/download/$tag/$asset")
+        $urls.Add("https://mirrors.aliyun.com/github-release/$owner/$repo/$tag/$asset")
+      } else {
+        $ghPath = $path.TrimStart('/')
+        if ($uri.Query) {
+          $ghPath += $uri.Query
+        }
+        $urls.Add("https://download.fastgit.org/$ghPath")
+      }
+
+      $urls.Add("https://ghproxy.com/$normalizedPrimary")
+    } elseif ($host -eq 'nodejs.org' -and $path -match '^/dist/(?<version>[^/]+)/(?<asset>.+)$') {
+      $version = $Matches.version
+      $asset = $Matches.asset
+      $urls.Add("https://mirrors.aliyun.com/nodejs-release/$version/$asset")
+      $urls.Add("https://npmmirror.com/mirrors/node/$version/$asset")
+      $urls.Add("https://ghproxy.com/$normalizedPrimary")
+    } else {
+      $urls.Add("https://ghproxy.com/$normalizedPrimary")
+    }
+  } catch {
+    $urls.Add("https://ghproxy.com/$normalizedPrimary")
+  }
+
+  return $urls | Select-Object -Unique
+}
+
 function Download-And-Extract {
   param(
-    [string]$Url,
+    [string[]]$Urls,
     [string]$ArchiveName,
     [string]$Destination,
     [string]$InnerFolderName,
@@ -33,26 +90,40 @@ function Download-And-Extract {
 
   $archivePath = Join-Path $tempDir $ArchiveName
 
-  for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-    $attemptLabel = if ($MaxRetries -gt 1) { " (attempt $attempt/$MaxRetries)" } else { "" }
-    Write-Step "Downloading $ArchiveName$attemptLabel"
+  $downloadSucceeded = $false
 
-    try {
-      Invoke-WebRequest -Uri $Url -OutFile $archivePath -UseBasicParsing
-      break
-    } catch {
-      if (Test-Path $archivePath) {
-        Remove-Item -Force $archivePath
+  foreach ($url in $Urls) {
+    for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
+      $attemptLabel = if ($MaxRetries -gt 1) { " (attempt $attempt/$MaxRetries)" } else { "" }
+      Write-Step "Downloading $ArchiveName from $url$attemptLabel"
+
+      try {
+        Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
+        $downloadSucceeded = $true
+        break
+      } catch {
+        if (Test-Path $archivePath) {
+          Remove-Item -Force $archivePath
+        }
+
+        if ($attempt -eq $MaxRetries) {
+          Write-Step "Download failed from $url after $MaxRetries attempts. Last error: $_"
+        } else {
+          $delay = 5 * $attempt
+          Write-Step "Download failed, retrying in $delay seconds..."
+          Start-Sleep -Seconds $delay
+        }
       }
-
-      if ($attempt -eq $MaxRetries) {
-        throw "Failed to download $ArchiveName from $Url after $MaxRetries attempts. Last error: $_"
-      }
-
-      $delay = 5 * $attempt
-      Write-Step "Download failed, retrying in $delay seconds..."
-      Start-Sleep -Seconds $delay
     }
+
+    if ($downloadSucceeded) {
+      break
+    }
+  }
+
+  if (-not $downloadSucceeded) {
+    $allUrls = $Urls -join ', '
+    throw "Failed to download $ArchiveName from all sources: $allUrls"
   }
 
   $extractDir = Join-Path $tempDir ([IO.Path]::GetFileNameWithoutExtension($ArchiveName))
@@ -99,7 +170,8 @@ if (Test-Path $nodeTarget) {
   Write-Step "tools/node detected, skipping Node.js download"
 } else {
   $nodeUrl = "https://nodejs.org/dist/$NodeVersion/$NodeArchive"
-  Download-And-Extract -Url $nodeUrl -ArchiveName $NodeArchive -Destination $nodeTarget -InnerFolderName ([IO.Path]::GetFileNameWithoutExtension($NodeArchive))
+  $nodeSources = Get-DownloadUrls -PrimaryUrl $nodeUrl
+  Download-And-Extract -Urls $nodeSources -ArchiveName $NodeArchive -Destination $nodeTarget -InnerFolderName ([IO.Path]::GetFileNameWithoutExtension($NodeArchive))
   Write-Step "Portable Node.js installed to tools/node"
 }
 
@@ -109,7 +181,8 @@ if (Test-Path $pandocTarget) {
   Write-Step "tools/pandoc detected, skipping Pandoc download"
 } else {
   $pandocUrl = "https://github.com/jgm/pandoc/releases/download/$PandocVersion/$PandocArchive"
-  Download-And-Extract -Url $pandocUrl -ArchiveName $PandocArchive -Destination $pandocTarget -InnerFolderName 'pandoc-3.5-windows-x86_64'
+  $pandocSources = Get-DownloadUrls -PrimaryUrl $pandocUrl
+  Download-And-Extract -Urls $pandocSources -ArchiveName $PandocArchive -Destination $pandocTarget -InnerFolderName 'pandoc-3.5-windows-x86_64'
   Write-Step "Pandoc installed to tools/pandoc"
 }
 
