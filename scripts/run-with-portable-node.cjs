@@ -8,7 +8,7 @@ const path = require('node:path');
 const [, , command, ...extraArgs] = process.argv;
 
 if (!command) {
-  console.error('請提供要執行的命令，例如：run-with-portable-node dev');
+  console.error('Please provide a command, e.g. run-with-portable-node dev');
   process.exit(1);
 }
 
@@ -23,8 +23,8 @@ const defaultPortableNode =
 const portableNode = process.env.PORTABLE_NODE_PATH || defaultPortableNode;
 
 if (!fs.existsSync(portableNode)) {
-  console.error(`找不到可用的 Node 執行檔：${portableNode}`);
-  console.error('請確認 tools/node/ 是否存在，或設定 PORTABLE_NODE_PATH 指向其他 Node。');
+  console.error(`Unable to find a Node executable at: ${portableNode}`);
+  console.error('Ensure tools/node/ exists or set PORTABLE_NODE_PATH to a different Node binary.');
   process.exit(1);
 }
 
@@ -41,7 +41,7 @@ const commandMap = {
 const entry = commandMap[command];
 
 if (!entry) {
-  console.error(`不支援的命令：${command}`);
+  console.error(`Unsupported command: ${command}`);
   process.exit(1);
 }
 

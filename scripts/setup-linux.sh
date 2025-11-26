@@ -24,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# 检查必要的命令是否存在
+# Verify required commands exist
 check_dependencies() {
   local missing=()
   for cmd in curl tar; do
@@ -34,9 +34,9 @@ check_dependencies() {
   done
   
   if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "错误: 缺少必要的命令: ${missing[*]}" >&2
-    echo "请先安装: sudo apt-get install -y curl tar (Debian/Ubuntu)" >&2
-    echo "或: sudo yum install -y curl tar (CentOS/RHEL)" >&2
+    echo "Error: missing required commands: ${missing[*]}" >&2
+    echo "Install via: sudo apt-get install -y curl tar (Debian/Ubuntu)" >&2
+    echo "or: sudo yum install -y curl tar (CentOS/RHEL)" >&2
     exit 1
   fi
 }
@@ -52,11 +52,11 @@ download_and_extract() {
   local strip_components="${4:-0}"
 
   local archive_path="${TEMP_DIR}/${archive}"
-  step "下载 ${archive}"
+  step "Downloading ${archive}"
   
-  # 下载文件，带重试和错误处理
+  # Download with retry and error handling
   if ! curl -L --fail --retry 3 --retry-delay 2 "${url}" -o "${archive_path}"; then
-    echo "错误: 下载失败: ${url}" >&2
+    echo "Error: failed to download ${url}" >&2
     exit 1
   fi
 
@@ -65,54 +65,54 @@ download_and_extract() {
 
   if [[ "${archive}" == *.zip ]]; then
     if ! command -v unzip >/dev/null 2>&1; then
-      echo "错误: 需要 unzip 命令来解压 .zip 文件" >&2
-      echo "请安装: sudo apt-get install -y unzip" >&2
+      echo "Error: unzip is required to extract .zip archives" >&2
+      echo "Install via: sudo apt-get install -y unzip" >&2
       exit 1
     fi
     unzip -q "${archive_path}" -d "${TEMP_DIR}/extract"
     mv "${TEMP_DIR}/extract"/* "${dest}"
   elif [[ "${archive}" == *.tar.gz ]]; then
     if ! tar -xzf "${archive_path}" -C "${dest}" --strip-components="${strip_components}"; then
-      echo "错误: 解压失败: ${archive}" >&2
+      echo "Error: failed to extract ${archive}" >&2
       exit 1
     fi
   elif [[ "${archive}" == *.tar.xz ]]; then
     if ! tar -xJf "${archive_path}" -C "${dest}" --strip-components="${strip_components}"; then
-      echo "错误: 解压失败: ${archive}" >&2
+      echo "Error: failed to extract ${archive}" >&2
       exit 1
     fi
   else
-    step "未知的压缩格式：${archive}"
+    step "Unknown archive format: ${archive}"
     exit 1
   fi
 }
 
 if [[ -d "${NODE_TARGET}" ]]; then
-  step "检测到 tools/node，跳过 Node.js 下载"
+  step "tools/node detected, skipping Node.js download"
 else
   download_and_extract "${NODE_URL}" "${NODE_ARCHIVE}" "${NODE_TARGET}" 1
-  step "已安装 portable Node.js 到 tools/node"
+  step "Portable Node.js installed in tools/node"
 fi
 
 if [[ -d "${PANDOC_TARGET}" ]]; then
-  step "检测到 tools/pandoc，跳过 Pandoc 下载"
+  step "tools/pandoc detected, skipping Pandoc download"
 else
   download_and_extract "${PANDOC_URL}" "${PANDOC_ARCHIVE}" "${PANDOC_TARGET}" 1
-  step "已安装 Pandoc 到 tools/pandoc"
+  step "Pandoc installed in tools/pandoc"
 fi
 
 export PATH="${NODE_TARGET}/bin:${PATH}"
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "错误: 找不到 node 命令，请确认工具是否下载成功" >&2
+  echo "Error: node command not found, verify portable tools were installed" >&2
   exit 1
 fi
 
-step "使用 portable Node.js 执行 npm install"
+step "Running npm install via portable Node.js"
 cd "${PROJECT_ROOT}"
 if ! npm install; then
-  echo "错误: npm install 失败" >&2
+  echo "Error: npm install failed" >&2
   exit 1
 fi
 
-bold "✅ 初始化完成，可执行 npm run dev 或 npm run build && npm run start"
+bold "Initialization complete. You can now run npm run dev or npm run build && npm run start"
