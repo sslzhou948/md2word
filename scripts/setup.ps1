@@ -22,7 +22,8 @@ function Download-And-Extract {
     [string]$Url,
     [string]$ArchiveName,
     [string]$Destination,
-    [string]$InnerFolderName
+    [string]$InnerFolderName,
+    [int]$MaxRetries = 3
   )
 
   $tempDir = Join-Path $env:TEMP 'md2word-setup'
@@ -32,8 +33,27 @@ function Download-And-Extract {
 
   $archivePath = Join-Path $tempDir $ArchiveName
 
-  Write-Step "Downloading $ArchiveName"
-  Invoke-WebRequest -Uri $Url -OutFile $archivePath
+  for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
+    $attemptLabel = if ($MaxRetries -gt 1) { " (attempt $attempt/$MaxRetries)" } else { "" }
+    Write-Step "Downloading $ArchiveName$attemptLabel"
+
+    try {
+      Invoke-WebRequest -Uri $Url -OutFile $archivePath -UseBasicParsing
+      break
+    } catch {
+      if (Test-Path $archivePath) {
+        Remove-Item -Force $archivePath
+      }
+
+      if ($attempt -eq $MaxRetries) {
+        throw "Failed to download $ArchiveName from $Url after $MaxRetries attempts. Last error: $_"
+      }
+
+      $delay = 5 * $attempt
+      Write-Step "Download failed, retrying in $delay seconds..."
+      Start-Sleep -Seconds $delay
+    }
+  }
 
   $extractDir = Join-Path $tempDir ([IO.Path]::GetFileNameWithoutExtension($ArchiveName))
   if (Test-Path $extractDir) {
@@ -45,10 +65,21 @@ function Download-And-Extract {
     Remove-Item -Recurse -Force $Destination
   }
 
-  $sourcePath = if ($InnerFolderName) {
-    Join-Path $extractDir $InnerFolderName
-  } else {
-    $extractDir
+  $sourcePath = $extractDir
+  if ($InnerFolderName) {
+    $candidate = Join-Path $extractDir $InnerFolderName
+    if (Test-Path $candidate) {
+      $sourcePath = $candidate
+    } else {
+      $childDirs = Get-ChildItem -Path $extractDir -Directory
+      if ($childDirs.Count -eq 1) {
+        $sourcePath = $childDirs[0].FullName
+        Write-Step "Inner folder $InnerFolderName not found, using detected folder '$($childDirs[0].Name)'"
+      } else {
+        $available = ($childDirs | ForEach-Object { $_.Name }) -join ', '
+        throw "Unable to locate inner folder '$InnerFolderName' under $extractDir. Available directories: $available"
+      }
+    }
   }
 
   Move-Item -Path $sourcePath -Destination $Destination
