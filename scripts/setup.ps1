@@ -194,6 +194,21 @@ if (Test-Path $nodeTarget) {
   Write-Step "Portable Node.js installed to tools/node"
 }
 
+# Optionally add portable Node.js to the current user's PATH so that `node` / `npm` work in new terminals
+try {
+  $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+  $pathEntries = $userPath -split ';'
+  if ($pathEntries -notcontains $nodeTarget) {
+    $newUserPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $nodeTarget } else { "$userPath;$nodeTarget" }
+    [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+    Write-Step "Added $nodeTarget to your user PATH. Open a new terminal to use node/npm directly."
+  } else {
+    Write-Step "Portable Node.js path is already present in your user PATH."
+  }
+} catch {
+  Write-Step "Failed to update user PATH, continuing with local PATH only."
+}
+
 ## Install portable Pandoc
 $pandocTarget = Join-Path $projectRoot 'tools\pandoc'
 if (Test-Path $pandocTarget) {
