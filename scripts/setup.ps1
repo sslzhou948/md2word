@@ -70,16 +70,17 @@ function Get-DownloadUrls {
       $version = $Matches.version
       $asset = $Matches.asset
 
-      # Node.js mirrors
+      # For Node.js: keep the original fast path (official first, then domestic mirrors, then proxies)
+      # 1) Original official Node.js URL
+      $urls.Add($normalizedPrimary)
+
+      # 2) Domestic mirrors
       $urls.Add("https://mirrors.aliyun.com/nodejs-release/$version/$asset")
       $urls.Add("https://npmmirror.com/mirrors/node/$version/$asset")
 
-      # Proxies
+      # 3) Proxies as a fallback
       $urls.Add("https://ghproxy.net/$normalizedPrimary")
       $urls.Add("https://ghproxy.com/$normalizedPrimary")
-
-      # Original as a fallback
-      $urls.Add($normalizedPrimary)
     } else {
       # Generic case: proxy first, then original
       $urls.Add("https://ghproxy.net/$normalizedPrimary")
@@ -104,6 +105,9 @@ function Download-And-Extract {
     [int]$MaxRetries = 3
   )
 
+  # Disable PowerShell progress bar to avoid UI overhead causing timeouts on large downloads
+  $ProgressPreference = 'SilentlyContinue'
+
   $tempDir = Join-Path $env:TEMP 'md2word-setup'
   if (!(Test-Path $tempDir)) {
     New-Item -ItemType Directory -Path $tempDir | Out-Null
@@ -119,19 +123,38 @@ function Download-And-Extract {
       Write-Step "Downloading $ArchiveName from $url$attemptLabel"
 
       try {
-        Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing
-        $downloadSucceeded = $true
-        break
-      } catch {
+        # If a partial file exists from a previous attempt, remove it first
         if (Test-Path $archivePath) {
           Remove-Item -Force $archivePath
         }
 
+        # Primary download method: BITS, designed for unstable networks and large files
+        Start-BitsTransfer -Source $url -Destination $archivePath -ErrorAction Stop
+
+        $downloadSucceeded = $true
+        break
+      } catch {
+        Write-Warning "BITS download failed: $_"
+
+        # Fallback: try system curl.exe if available
+        try {
+          Write-Step "Falling back to curl.exe..."
+          $curlCmd = "curl.exe"
+          # -L follow redirects, -f fail on HTTP errors, --retry adds its own retries
+          & $curlCmd -L -f --retry 3 -o "$archivePath" "$url"
+          if ($LASTEXITCODE -eq 0) {
+            $downloadSucceeded = $true
+            break
+          }
+        } catch {
+          # Ignore and continue to retry logic below
+        }
+
         if ($attempt -eq $MaxRetries) {
-          Write-Step "Download failed from $url after $MaxRetries attempts. Last error: $_"
+          Write-Step "Download failed from $url after $MaxRetries attempts."
         } else {
-          $delay = 5 * $attempt
-          Write-Step "Download failed, retrying in $delay seconds..."
+          $delay = 3 * $attempt
+          Write-Step "Retrying in $delay seconds..."
           Start-Sleep -Seconds $delay
         }
       }
@@ -147,11 +170,14 @@ function Download-And-Extract {
     throw "Failed to download $ArchiveName from all sources: $allUrls"
   }
 
+  Write-Step "Download finished. Extracting..."
+
   $extractDir = Join-Path $tempDir ([IO.Path]::GetFileNameWithoutExtension($ArchiveName))
   if (Test-Path $extractDir) {
     Remove-Item -Recurse -Force $extractDir
   }
-  Expand-Archive -Path $archivePath -DestinationPath $extractDir
+
+  Expand-Archive -Path $archivePath -DestinationPath $extractDir -Force
 
   if (Test-Path $Destination) {
     Remove-Item -Recurse -Force $Destination
@@ -166,10 +192,16 @@ function Download-And-Extract {
       $childDirs = Get-ChildItem -Path $extractDir -Directory
       if ($childDirs.Count -eq 1) {
         $sourcePath = $childDirs[0].FullName
-        Write-Step "Inner folder $InnerFolderName not found, using detected folder '$($childDirs[0].Name)'"
       } else {
-        $available = ($childDirs | ForEach-Object { $_.Name }) -join ', '
-        throw "Unable to locate inner folder '$InnerFolderName' under $extractDir. Available directories: $available"
+        # As a fallback, try to auto-detect the folder containing pandoc.exe
+        $exeFiles = Get-ChildItem -Path $extractDir -Filter "pandoc.exe" -Recurse -ErrorAction SilentlyContinue
+        if ($exeFiles.Count -gt 0) {
+          $sourcePath = $exeFiles[0].DirectoryName
+          Write-Step "Auto-detected folder containing pandoc.exe"
+        } else {
+          $available = ($childDirs | ForEach-Object { $_.Name }) -join ', '
+          throw "Unable to locate inner folder '$InnerFolderName' under $extractDir. Available directories: $available"
+        }
       }
     }
   }
