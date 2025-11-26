@@ -1,15 +1,17 @@
 ## md2word · Markdown → Word
 
+> 这是 **中文** 说明文档。English version: `README.en.md`。
+
 md2word 是一个基于 Next.js 14 的 Markdown → Word 转换工具：前端提供可视化表单，后端通过 LLM 清洗 Markdown，再结合 Word 模板产出 docx 文件。项目同时适配 Windows / Linux，内置一键初始化脚本，方便在本地或服务器部署。
 
 ---
 
 ## 核心特性
 - **AI 清洗**：LLM 自动修复 Markdown 结构，保持标题/列表层级，禁止幻觉内容。
-- **官方模板库**：所有 Word 模板集中存放在 `templates/`，由我们统一维护。
+- **官方模板库**：所有 Word 模板集中存放在 `templates/`，由我们统一维护，不开放用户上传。
 - **详细报错**：API 统一返回 `CONV_*` 错误码 + 环节说明，前端也会展示。
 - **健康检查**：前端可一键 ping `/api/llm-health`，快速判断 LLM 服务是否可用。
-- **日志+限流**：后端记录输入长度、耗时、故障码，并区分 LLM 清洗/文本转 Markdown 两类频率限制。
+- **日志 + 计数**：后端记录输入长度、耗时、故障码，并在 `data/stats.json` 中累计成功生成次数，在首页展示真实使用人数。
 
 ---
 

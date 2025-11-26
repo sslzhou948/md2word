@@ -1,29 +1,39 @@
 ## md2word · Markdown → Word
 
-This project uses Next.js 14 (App Router) plus an AI-powered Markdown formatting pipeline to export docx with custom templates. It runs on Windows or Linux servers and ships portable tooling plus automation scripts for one-command setup.
+> This is the **English** README. For the Chinese version, see `README.md`.
 
-### Key Features
-- LLM cleans Markdown while preserving headings/lists and avoiding hallucinations.
-- The formatter applies Word templates stored in `templates/`.
-- Frontend form uploads Markdown, selects template, downloads docx, and can ping LLM health.
-- API returns structured error codes + failure steps (`CONV_*`) to speed up debugging.
+md2word is a Markdown → Word converter built on **Next.js 14 App Router**.  
+The frontend provides a visual form; the backend uses an LLM to clean Markdown, then applies a Word template to produce a `.docx` file. It runs on both Windows and Linux and ships with portable tooling and initialization scripts.
 
-### Tech Stack
-- Next.js 14 App Router (Node.js runtime API routes)
-- `fetch` to OpenAI-compatible Chat Completions API
-- Portable doc-conversion CLI (override via `PANDOC_PATH` if desired)
-- Code organized under `config/`, `lib/`, `components/`, `api/`
+---
 
-### Environment Variables
+### Key features
+- **AI‑assisted cleanup**: LLM fixes Markdown structure, keeps heading/list hierarchy and avoids hallucinations.
+- **Official template library only**: All Word templates live under `templates/` and are maintained centrally.
+- **Detailed error reporting**: APIs return `CONV_*` error codes plus which step failed; the UI surfaces these.
+- **Health check**: Frontend can ping `/api/llm-health` to verify LLM connectivity.
+- **Usage counter**: Every successful Word export increments a local counter in `data/stats.json` and updates the homepage badge.
+
+---
+
+### Tech stack
+- Next.js 14 App Router (Node.js runtime)
+- `fetch` to OpenAI‑compatible Chat Completions API
+- Portable docx conversion CLI (override with `PANDOC_PATH` if you host your own binary)
+- Directory layout: `config/`, `lib/`, `components/`, `app/`
+
+---
+
+### Environment variables
 | Name | Description |
 | --- | --- |
-| `LLM_API_KEY` | API key for LLM provider |
+| `LLM_API_KEY` | API key for the LLM provider |
 | `LLM_API_BASE_URL` | e.g. `https://api.openai.com/v1` |
 | `LLM_MODEL` | e.g. `gpt-4.1-mini` |
-| `PANDOC_PATH` | *(optional)* custom path to the doc-conversion CLI |
+| `PANDOC_PATH` | *(optional)* custom path to the docx conversion CLI |
 | `PORTABLE_NODE_PATH` | *(optional)* custom path to portable Node |
 
-> Copy `.env.local.example` to `.env.local` (or `.env`), then fill the values:
+> Initialize from the example file:
 > ```bash
 > # Windows PowerShell
 > Copy-Item .env.local.example .env.local
@@ -31,76 +41,142 @@ This project uses Next.js 14 (App Router) plus an AI-powered Markdown formatting
 > cp .env.local.example .env.local
 > ```
 
-### Local Development
+---
+
+### Local development
 ```bash
 npm install
 npm run dev
 # http://localhost:3000
 ```
-> Portable Node lives under `tools/node/`. Delete it if you prefer system Node.
+> If you do not want to use the portable Node under `tools/node/`, delete that folder and use a system Node.js 20+ instead.
 
-### From GitHub to Deployment
-1. **Clone**
+---
+
+### From GitHub to deployment
+1. **Clone the repo**
    ```bash
    git clone https://github.com/sslzhou948/md2word.git
    cd md2word
    ```
-2. **Environment variables**
+2. **Configure environment variables**
    ```bash
    Copy-Item .env.local.example .env.local   # Windows
    cp .env.local.example .env.local         # macOS / Linux
    ```
-3. **Initialize dependencies**
+3. **Run initialization scripts**
    ```powershell
-   # Windows
+   # Windows (PowerShell)
    powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
-   # Linux / macOS
+
+   # Linux
    chmod +x scripts/setup-linux.sh
    ./scripts/setup-linux.sh
    ```
-   These scripts download portable Node.js / the conversion CLI (if needed) and run `npm install`.
-4. **Run**
+   - The Windows script downloads **portable Node.js** and the docx converter from a set of mirrors
+     (official site, domestic mirrors, GitHub proxy, etc.), with retries, TLS 1.2 enforced, and
+     BITS + `curl.exe` fallback for unstable networks.
+   - The Linux script checks `curl`/`tar`, retries downloads with backoff, and then runs `npm install`.
+4. **Run the app**
    ```bash
    npm run dev                    # development
    npm run build && npm run start # production
    ```
 
-### nginx Reverse Proxy Essentials
-- `proxy_read_timeout 300s` / `proxy_send_timeout 300s` / `proxy_connect_timeout 300s`
-- `send_timeout 300s` to keep the downstream connection alive while the converter/LLM work
-- `client_max_body_size 10M`
-- `proxy_buffering on`, `proxy_buffer_size 4k`, `proxy_buffers 8 4k`
-- Full sample: `nginx.conf.example`
+---
 
-### API Flow
-1. `POST /api/convert` receives `markdown`, `templateId`
-2. `cleanMarkdownWithLlm` normalizes Markdown through LLM
-3. `convertMarkdownToDocx` applies the selected Word template via the conversion engine to output docx
-4. Response returns docx (base64) + cleaned Markdown preview
+### Template maintenance (official templates only)
+> Version 2.0 only exposes **official templates**. End users cannot upload their own templates.
 
-### Health Check & Error Codes
-- `GET /api/llm-health` performs a lightweight LLM ping.
-- Convert API emits error codes (`CONV_01_01`, `CONV_03_99`, `CONV_99_TIMEOUT`, …).
-- Frontend shows code + failure step + hints (e.g. nginx timeout, pandoc missing).
+1. **Where to put templates?**  
+   - Place all `.docx` template files under the `templates/` directory.  
+   - Filenames are free‑form, e.g. `official-document.docx`, `proposal-2024.docx`.
 
-### Common Issues
-| Problem | Cause | Fix |
-| --- | --- | --- |
-| `npm` not found | Node missing / portable Node not used | Run setup script or install Node 20+ |
-| `PSSecurityException` | PowerShell blocked | `Set-ExecutionPolicy -Scope Process Bypass` |
-| `pandoc: command not found` | Binary missing | Keep `tools/pandoc/` or set `PANDOC_PATH` |
-| `CONV_99_TIMEOUT` | nginx timeout too short | Increase `proxy_read_timeout` (≥300s) |
-| 429/5xx from LLM | Rate limit / upstream failure | Retry later, use LLM health check |
+2. **How to expose templates in the UI?**  
+   - Edit `src/config/templates.ts` and declare each template:
+     ```ts
+     {
+       id: 'official-document',
+       name: 'Official document',
+       description: 'For notices and formal documents',
+       filename: 'official-document.docx',
+       category: 'Official',
+       previewImage: 'templates/previews/official-document.svg',
+     }
+     ```
+   - `previewImage` is resolved from `public/`, you can use simple SVG/PNG placeholders.
 
-### File Structure Notes
-- Templates: add docx under `templates/` and declare in `src/config/templates.ts`
-- Prompt config at `src/config/llmPrompt.ts`
-- Portable toolchain lives under `tools/` (ignored by Git)
-- Logs output to `logs/` (ignored by Git)
+3. **Why not allow user uploads?**  
+   - There is no user system yet, so user‑uploaded templates would be shared by everyone.  
+   - This can easily leak private layouts or cause conflicts.  
+   - If a custom template is needed, an admin can manually add it under `templates/` and register it in `templates.ts`.
 
-### Roadmap Ideas
-- Template management UI
-- Batch / queue processing
-- Extract formatting logic as reusable package (Electron/Tauri)
+4. **Future plans**  
+   - Later versions may add a user system and per‑user template preferences or temporary templates.
 
 ---
+
+### nginx reverse proxy notes
+- `proxy_read_timeout 300s` / `proxy_send_timeout 300s` / `proxy_connect_timeout 300s`
+- `send_timeout 300s` so long‑running LLM / conversion is not cut off.
+- `client_max_body_size 10M`
+- `proxy_buffering on`, `proxy_buffer_size 4k`, `proxy_buffers 8 4k`
+- See `nginx.conf.example` for a complete sample.
+
+---
+
+### API flow
+1. `POST /api/convert` with `markdown` and `templateId`.
+2. Optionally normalize plain text into Markdown.
+3. `cleanMarkdownWithLlm` uses the LLM to clean and structure the Markdown.
+4. The docx converter applies the selected template and produces a file.
+5. The response returns `cleanedMarkdown`, `fileBase64`, the filename, and flags like `wasConverted`.
+
+---
+
+### Health check & error codes
+- `GET /api/llm-health` tests whether the LLM backend is reachable and returns latency plus a small sample.
+- The convert API returns error codes such as:
+  - `CONV_01_01` empty input
+  - `CONV_02_01` template unavailable
+  - `CONV_03_99` LLM cleanup failed
+  - `CONV_04_02/03` template missing / permission issue
+  - `CONV_99_TIMEOUT` reverse proxy or LLM timeout
+
+---
+
+### Common issues
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| `npm` not found | Node missing / portable Node not on PATH | Run the setup script or install Node 20+ |
+| `PSSecurityException` | PowerShell blocked scripts | `Set-ExecutionPolicy -Scope Process Bypass` |
+| Docx converter not found | CLI missing | Keep `tools/pandoc/` or set `PANDOC_PATH` |
+| `CONV_99_TIMEOUT` | Reverse proxy timeout too short | Increase `proxy_read_timeout` (≥300s) |
+| 429 / 5xx from LLM | Rate limit / upstream failure | Retry later and use the LLM health check endpoint |
+
+---
+
+### Directory overview
+- `templates/` – Official Word templates (pair with `src/config/templates.ts`)
+- `src/config/llmPrompt.ts` – LLM prompt for Markdown cleanup
+- `src/lib/` – LLM client, converter wrapper, rate limiting, logging utilities
+- `logs/` – Usage logs with local‑timezone timestamps
+- `data/stats.json` – Counter of successful conversions (incremented by 1 per success)
+
+---
+
+### Roadmap (ideas)
+- Template management UI (upload / preview / enable)
+- Batch conversion and job queues
+- Extract cleanup / conversion logic into a reusable library for Electron/Tauri
+- User system with personalized template preferences
+
+---
+
+If you run into issues, please first check:
+1. `.env.local` configuration  
+2. Reverse‑proxy timeouts (nginx, etc.)  
+3. The `CONV_*` error code shown in the UI  
+4. Detailed logs written under `logs/` (with local‑timezone timestamps)
+
+Feel free to open an Issue / PR, or reach out via the contact info in the Chinese README.
