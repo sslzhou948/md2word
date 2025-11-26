@@ -10,6 +10,9 @@
 $OutputEncoding = [System.Text.Encoding]::UTF8
 chcp 65001 | Out-Null
 
+# Force enable TLS 1.2 to avoid HTTPS handshake issues with some mirrors
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
 $ErrorActionPreference = 'Stop'
 
 function Write-Step {
@@ -23,9 +26,6 @@ function Get-DownloadUrls {
   $urls = New-Object System.Collections.Generic.List[string]
 
   $normalizedPrimary = $PrimaryUrl.Trim()
-  if (-not [string]::IsNullOrWhiteSpace($normalizedPrimary)) {
-    $urls.Add($normalizedPrimary)
-  }
 
   try {
     $uri = [Uri]$normalizedPrimary
@@ -38,10 +38,17 @@ function Get-DownloadUrls {
       if ($uri.Query) {
         $mirrorUrl += $uri.Query
       }
-      $urls.Insert(0, $mirrorUrl)
+      $urls.Add($mirrorUrl)
     }
 
     if ($host -eq 'github.com') {
+      # 1) Prefer ghproxy.net which you verified works
+      $urls.Add("https://ghproxy.net/$normalizedPrimary")
+
+      # 2) Then try the original GitHub URL
+      $urls.Add($normalizedPrimary)
+
+      # 3) Then GitHub release mirrors
       if ($path -match '^/(?<owner>[^/]+)/(?<repo>[^/]+)/releases/download/(?<tag>[^/]+)/(?<asset>.+)$') {
         $owner = $Matches.owner
         $repo = $Matches.repo
@@ -57,18 +64,32 @@ function Get-DownloadUrls {
         $urls.Add("https://download.fastgit.org/$ghPath")
       }
 
+      # 4) Finally fall back to ghproxy.com
       $urls.Add("https://ghproxy.com/$normalizedPrimary")
     } elseif ($host -eq 'nodejs.org' -and $path -match '^/dist/(?<version>[^/]+)/(?<asset>.+)$') {
       $version = $Matches.version
       $asset = $Matches.asset
+
+      # Node.js mirrors
       $urls.Add("https://mirrors.aliyun.com/nodejs-release/$version/$asset")
       $urls.Add("https://npmmirror.com/mirrors/node/$version/$asset")
+
+      # Proxies
+      $urls.Add("https://ghproxy.net/$normalizedPrimary")
       $urls.Add("https://ghproxy.com/$normalizedPrimary")
+
+      # Original as a fallback
+      $urls.Add($normalizedPrimary)
     } else {
+      # Generic case: proxy first, then original
+      $urls.Add("https://ghproxy.net/$normalizedPrimary")
       $urls.Add("https://ghproxy.com/$normalizedPrimary")
+      $urls.Add($normalizedPrimary)
     }
   } catch {
+    $urls.Add("https://ghproxy.net/$normalizedPrimary")
     $urls.Add("https://ghproxy.com/$normalizedPrimary")
+    $urls.Add($normalizedPrimary)
   }
 
   return $urls | Select-Object -Unique
