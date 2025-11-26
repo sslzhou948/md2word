@@ -34,6 +34,13 @@ const stepOrder: ProcessingStep[] = [
   '文本生成',
 ];
 
+const allSteps: ProcessingStep[] = [...stepOrder, '完成'];
+
+function toProcessingStep(value: string | undefined | null): ProcessingStep | null {
+  if (!value) return null;
+  return allSteps.includes(value as ProcessingStep) ? (value as ProcessingStep) : null;
+}
+
 // 字数显示组件
 function WordCountDisplay({ count }: { count: number }) {
   const maxLength = appConfig.maxInputLength;
@@ -218,12 +225,13 @@ export function ConvertForm({ templates }: Props) {
         }),
       });
 
-      // 更新进度状态（根据响应中的step字段）
+      // 更新进度状态（根据响应中的 step 字段）
       if (response.ok) {
         const data = (await response.json()) as MarkdownToWordResponse;
         clearStepTimers();
         stopElapsedTimer();
-        setCurrentStep(data.step || '完成');
+        const finishedStep = toProcessingStep(data.step) ?? '完成';
+        setCurrentStep(finishedStep);
         
         setCleanedMarkdown(data.cleanedMarkdown);
         downloadBase64Docx(data.fileBase64, data.filename);
@@ -241,7 +249,7 @@ export function ConvertForm({ templates }: Props) {
         setErrorDetails(errorData);
         clearStepTimers();
         stopElapsedTimer();
-        setCurrentStep(errorData.step || null);
+        setCurrentStep(toProcessingStep(errorData.step) ?? null);
         throw new Error(errorData?.message ?? '生成失败');
       }
     } catch (err) {
