@@ -197,14 +197,42 @@ if (Test-Path $nodeTarget) {
 # Optionally add portable Node.js to the current user's PATH so that `node` / `npm` work in new terminals
 try {
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-  $pathEntries = $userPath -split ';'
-  if ($pathEntries -notcontains $nodeTarget) {
-    $newUserPath = if ([string]::IsNullOrWhiteSpace($userPath)) { $nodeTarget } else { "$userPath;$nodeTarget" }
-    [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
-    Write-Step "Added $nodeTarget to your user PATH. Open a new terminal to use node/npm directly."
-  } else {
-    Write-Step "Portable Node.js path is already present in your user PATH."
+
+  # Normalize to empty string if null
+  if ($null -eq $userPath) {
+    $userPath = ''
   }
+
+  $separator = ';'
+  $pathEntries =
+    if ([string]::IsNullOrWhiteSpace($userPath)) {
+      @()
+    } else {
+      $userPath -split $separator
+    }
+
+  # Remove any old md2word portable-node entries that point to a different folder
+  $cleanedEntries = $pathEntries |
+    Where-Object {
+      $entry = $_.Trim()
+      if ([string]::IsNullOrWhiteSpace($entry)) { return $false }
+
+      $isMd2WordNode = $entry -like '*md2word*tools\node*'
+      $isCurrentNode = [string]::Equals($entry, $nodeTarget, [StringComparison]::OrdinalIgnoreCase)
+
+      # Keep non-md2word entries, and keep the current nodeTarget, drop stale md2word/tools/node paths
+      return (-not $isMd2WordNode) -or $isCurrentNode
+    }
+
+  $hasCurrentNode = $cleanedEntries -contains $nodeTarget
+  if (-not $hasCurrentNode) {
+    $cleanedEntries += $nodeTarget
+  }
+
+  $newUserPath = ($cleanedEntries | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join $separator
+  [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+
+  Write-Step "Ensured portable Node.js path '$nodeTarget' is present in your user PATH. Open a new terminal to use node/npm directly."
 } catch {
   Write-Step "Failed to update user PATH, continuing with local PATH only."
 }
