@@ -211,7 +211,21 @@ if (!(Test-Path $npmCmd)) {
   throw "Cannot find $npmCmd, please verify portable Node.js installation"
 }
 
+## Ensure portable Node.js is visible to any child processes (so 'node' is resolvable on PATH)
+$env:PATH = "$nodeTarget;$env:PATH"
+
+## Optionally configure a fast npm registry mirror (safe to run multiple times)
+try {
+  & $npmCmd config set registry https://registry.npmmirror.com | Out-Null
+} catch {
+  Write-Step "Failed to set npm registry mirror, continuing with default registry"
+}
+
 Write-Step "Running npm install (using portable Node.js)"
-& $npmCmd install
+& $npmCmd install --no-audit
+
+if ($LASTEXITCODE -ne 0) {
+  throw "npm install failed with exit code $LASTEXITCODE"
+}
 
 Write-Host "`nInitialization complete. You can now run: npm run dev or npm run build" -ForegroundColor Green
