@@ -70,16 +70,17 @@ function Get-DownloadUrls {
       $version = $Matches.version
       $asset = $Matches.asset
 
-      # Node.js mirrors
+      # For Node.js: keep the original fast path (official first, then domestic mirrors, then proxies)
+      # 1) Original official Node.js URL
+      $urls.Add($normalizedPrimary)
+
+      # 2) Domestic mirrors
       $urls.Add("https://mirrors.aliyun.com/nodejs-release/$version/$asset")
       $urls.Add("https://npmmirror.com/mirrors/node/$version/$asset")
 
-      # Proxies
+      # 3) Proxies as a fallback
       $urls.Add("https://ghproxy.net/$normalizedPrimary")
       $urls.Add("https://ghproxy.com/$normalizedPrimary")
-
-      # Original as a fallback
-      $urls.Add($normalizedPrimary)
     } else {
       # Generic case: proxy first, then original
       $urls.Add("https://ghproxy.net/$normalizedPrimary")
